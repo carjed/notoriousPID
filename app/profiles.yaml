@@ -1,0 +1,44 @@
+bread:
+    bulk:
+        setpoint: 25.5
+        fanlevel: 0.8
+    proof:
+        setpoint: 3.3
+        fanlevel: 0.2
+    fast:
+        setpoint: 30
+        fanlevel: 0.99
+    enriched:
+        setpoint: 27
+        fanlevel: 0.5
+    rye:
+        setpoint: 27
+        fanlevel: 0.8
+wine:
+    red:
+        setpoint: 15.5
+        fanlevel: 0.2
+    white:
+        setpoint: 10
+        fanlevel: 0.2
+    sparkling:
+        setpoint: 9
+        fanlevel: 0.2
+pickles:
+    default:
+        setpoint: 24
+        fanlevel: 0.2
+    kimchi:
+        setpoint: 18.3
+        fanlevel: 0.2
+kombucha:
+    default:
+        setpoint: 24
+        fanlevel: 0.2
+    fast:
+        setpoint: 28
+        fanlevel: 0.2
+yogurt:
+    default:
+        setpoint: 43
+        fanlevel: 0.2

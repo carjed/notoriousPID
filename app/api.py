@@ -14,21 +14,29 @@ from flask_restful import reqparse, abort, Resource, Api
 
 # read and format JSON payload from Arduino
 def serialRead():
-    for x in range(3):
-        ser.write("\r\n".encode())
+    ser.reset_output_buffer()
+    ser.write("\r\n".encode())
     payload = ser.readline().decode('utf8').replace("\r\n", "").replace("'", '"')
     json_payload = json.loads(payload)
     return(json_payload)
 
 # send serial command to Arduino
 def serialSend(data):
-    targets = ['setpoint', 'fanlevel']
+    targets = ['setpoint', 'fanlevel', 'kp', 'ki', 'kd', 'heatkp', 'heatki', 'heatkd']
     update_vars = {key: data[key] for key in data.keys() if key in targets}
     serial_payload = "/set?" + urllib.parse.urlencode(update_vars) + "\r\n"
     ser.write(serial_payload.encode())
-    time.sleep(1)
-    for x in range(3):
-        ser.write("\r\n".encode())
+    ser.readline() # sending a POST to arduino returns a confirmation; blackhole it with readline() to ensure proper JSON data
+
+# # send serial command to Arduino
+# def serialSendPID(data):
+#     targets = ['kp', 'ki', 'kd', 'heatkp', 'heatki', 'heatkd']
+#     update_vars = {key: data[key] for key in data.keys() if key in targets}
+#     serial_payload = "/pidset?" + urllib.parse.urlencode(update_vars) + "\r\n"
+#     ser.write(serial_payload.encode())
+#     ser.readline() # sending a POST to arduino returns a confirmation; blackhole it with readline() to ensure proper JSON data
+
+
 
 # refresh data with current JSON payload from Arduino
 def refreshJSON():
@@ -91,7 +99,7 @@ class CustomProfile(Resource):
         payload = request.get_json()
 
         # validate payload to update only allowable variables
-        targets = ['setpoint', 'fanlevel', 'profile']
+        targets = ['setpoint', 'fanlevel', 'profile', 'kp', 'ki', 'kd', 'heatkp', 'heatki', 'heatkd']
         payload_validated = {key: payload[key] for key in payload.keys() if key in targets}
         writeProfile(payload_validated, profile_path)
 
@@ -112,7 +120,7 @@ profile_path = 'profile.json'
 
 # initialize serial port
 print("initializing serial communication...")
-ser = serial.Serial('/dev/ttyS4', 115200)
+ser = serial.Serial('/dev/ttyACM0', 115200)
 
 # load profiles
 print("loading YAML profiles...")

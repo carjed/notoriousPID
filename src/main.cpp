@@ -50,17 +50,49 @@ void mainUpdate() {
 
 int setManual(String command){
   // parse string in the format param0=abc&param1=def
-  String param0 = getValue(command, '&', 0);
-  String param1 = getValue(command, '&', 1);
+  for (int i=0; i<8; i++){
+    String param = getValue(command, '&', i);
+    String value = getValue(param, '=', 1);
+    switch (i) {
+      case 0:
+        Setpoint = value.toDouble();
+        break;
+      case 1: 
+        fan_level = value.toFloat();
+        setPWM1A(fan_level);
+        break;
+      case 2:
+        Kp = value.toDouble();
+        break;
+      case 3:
+        Ki = value.toDouble();
+        break;
+      case 4:
+        Kd = value.toDouble();
+        break;
+      case 5:
+        heatKp = value.toDouble();
+        break;
+      case 6:
+        heatKi = value.toDouble();
+        break;
+      case 7:
+        heatKd = value.toDouble();
+        break;
+    }
+  }
 
-  // get param values assuming they are in the order [setpoint,fanspeed]
-  String setpoint = getValue(param0, '=', 1);
-  String fanspeed = getValue(param1, '=', 1);
-  fan_level = fanspeed.toFloat();
+  // String param0 = getValue(command, '&', 0);
+  // String param1 = getValue(command, '&', 1);
 
-  // set new setpoint and fan speed
-  Setpoint = setpoint.toDouble();
-  setPWM1A(fan_level);
+  // // get param values assuming they are in the order [setpoint,fanspeed]
+  // String setpoint = getValue(param0, '=', 1);
+  // String fanspeed = getValue(param1, '=', 1);
+  // fan_level = fanspeed.toFloat();
+
+  // // set new setpoint and fan speed
+  // Setpoint = setpoint.toDouble();
+  // setPWM1A(fan_level);
   return 1;
 }
 
@@ -125,15 +157,15 @@ void setup() {
   rest.variable("output", &Output);
   rest.variable("heatoutput", &heatOutput);
   rest.variable("kp", &Kp);
-
-  // Serial communication hangs when enabling these, for some reason
-  // rest.variable("ki", &Ki);
-  // rest.variable("kd", &Kd);
-  // rest.variable("heatkp", &heatKp);
-  // rest.variable("heatki", &heatKi);
-  // rest.variable("heatkd", &heatKd);
+  // Serial communication sometimes hangs when enabling these vars
+  rest.variable("ki", &Ki);
+  rest.variable("kd", &Kd);
+  rest.variable("heatkp", &heatKp);
+  rest.variable("heatki", &heatKi);
+  rest.variable("heatkd", &heatKd);
 
   rest.function((char*)"set", setManual);
+  // rest.function((char*)"pidset", setManualPID);
   // rest.function((char*)"profile", setProfile);
 
   rest.set_id("2");

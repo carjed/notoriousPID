@@ -1,4 +1,7 @@
 bread:
+    levain:
+        setpoint: 23.5
+        fanlevel: 0.5
     bulk:
         setpoint: 25.5
         fanlevel: 0.8

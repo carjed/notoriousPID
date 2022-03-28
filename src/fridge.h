@@ -15,12 +15,12 @@ enum opState {  // fridge operation states
 const double fridgeIdleDiff = 0.5;       // constrain fridge temperature to +/- 0.5 deg C (0.9 deg F) differential
 const double fridgePeakDiff = 0.25;      // constrain allowed peak error to +/- 0.25 deg C (0.45 deg F) differential
 const unsigned int coolMinOff = 300;     // minimum compressor off time, seconds (5 min)
-const unsigned int coolMinOn = 90;       // minimum compressor on time, seconds (1.5 min)
+const unsigned int coolMinOn = 30;       // minimum compressor on time, seconds (1 min)
 const unsigned int coolMaxOn = 2700;     // maximum compressor on time, seconds (45 min)
-const unsigned int peakMaxTime = 1200;   // maximum runTime to consider for peak estimation, seconds (20 min)
-const unsigned int peakMaxWait = 1800;   // maximum wait on peak, seconds (30 min)
-const unsigned int heatMinOff = 30;     // minimum HEAT off time, seconds (5 min)
-const unsigned long heatWindow = 300000;  // window size for HEAT time proportioning, ms (5 min)
+const unsigned int peakMaxTime = 300;   // maximum runTime to consider for peak estimation, seconds (5 min)
+const unsigned int peakMaxWait = 600;   // maximum wait on peak, seconds (10 min)
+const unsigned int heatMinOff = 10;     // minimum HEAT off time, seconds (0.5 min)
+const unsigned long heatWindow = 60000;  // window size for HEAT time proportioning, ms (1 min)
 
 extern byte fridgeState[2];      // [0] - current fridge state; [1] - fridge state t - 1 history
 extern double peakEstimator;     // to predict COOL overshoot; units of deg F per hour (always positive)

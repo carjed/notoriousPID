@@ -1,0 +1,1 @@
+{"setpoint": 3.3, "fanlevel": 0.2, "probetemp": 17.8125, "chambertemp": 17.875, "cooling": false, "heating": false, "output": 0.3, "heatoutput": 0, "kp": 50, "ki": 4, "kd": 200, "hkp": 2, "hki": 2, "hkd": 1, "profile": "bread/proof"}

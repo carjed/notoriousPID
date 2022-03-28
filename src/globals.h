@@ -4,7 +4,7 @@
 const byte onewireData = 2;  // one-wire data
 const byte relay1 = 6;       // relay 1 (fridge compressor)
 const byte relay2 = 5;       // relay 2 (heating element)
-
+const byte dhtpin = 7;
 // fan params
 const byte fan1a = 9;
 const byte fan1b = 10;
@@ -17,6 +17,7 @@ probe beer(&onewire), fridge(&onewire);
 
 // sensor values to expose to API
 double bt, ft;
+float humidity;
 bool relay1_status, relay2_status;
 bool temp_reached = false;
 const double epsilon = 1.0;

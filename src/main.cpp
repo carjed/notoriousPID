@@ -117,8 +117,9 @@ int setManual(String command){
   }
   
   mainPID.SetTunings(Kp, Ki, Kd);
+  mainPID.initHistory();
   heatPID.SetTunings(heatKp, heatKi, heatKd); 
-
+  heatPID.initHistory();
   return 1;
 }
 

@@ -19,8 +19,8 @@ const unsigned int coolMinOn = 30;       // minimum compressor on time, seconds 
 const unsigned int coolMaxOn = 2700;     // maximum compressor on time, seconds (45 min)
 const unsigned int peakMaxTime = 300;   // maximum runTime to consider for peak estimation, seconds (5 min)
 const unsigned int peakMaxWait = 600;   // maximum wait on peak, seconds (10 min)
-const unsigned int heatMinOff = 10;     // minimum HEAT off time, seconds (0.5 min)
-const unsigned long heatWindow = 60000;  // window size for HEAT time proportioning, ms (1 min)
+const unsigned int heatMinOff = 300;     // minimum HEAT off time, seconds (5 min)
+const unsigned long heatWindow = 300000;  // window size for HEAT time proportioning, ms (5 min)
 
 extern byte fridgeState[2];      // [0] - current fridge state; [1] - fridge state t - 1 history
 extern double peakEstimator;     // to predict COOL overshoot; units of deg F per hour (always positive)

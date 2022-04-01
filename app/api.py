@@ -3,6 +3,7 @@ import yaml
 import json
 import time
 import urllib.parse
+import os
 from datetime import datetime
 from os.path import exists
 from flask import Flask, jsonify, request
@@ -13,6 +14,8 @@ import flask.scaffold
 flask.helpers._endpoint_from_view_func = flask.scaffold._endpoint_from_view_func
 
 from flask_restful import reqparse, abort, Resource, Api
+
+dirname = os.path.dirname(__file__)
 
 def check(conf_schema, conf):
     try:
@@ -129,7 +132,7 @@ def loadProfiles(filepath):
             current['profile'] = product + "/" + mode
             # print(json.dumps(current))
 
-            filepath = "profiles/default/" + current['profile'] + '.json'
+            filepath = os.path.join(dirname, "profiles/default/" + current['profile'] + '.json')
             # print(os.path.dirname(filepath))
 
             if not os.path.exists(os.path.dirname(filepath)):
@@ -159,22 +162,31 @@ def loadProfiles(filepath):
 
 class Profiles(Resource):
     def get(self):
-        yaml_profiles = loadProfiles('profiles.yaml')
+        yaml_profiles = loadProfiles(os.path.join(dirname, 'profiles.yaml'))
         return jsonify(yaml_profiles)
 
 class Profile(Resource):
 
     # list profile data
-    def get(self, product, mode):
+    def get(self):
+
+        payload = request.get_json()
+        targets = ['product', 'mode']
+        product = payload['product']
+        mode = payload['mode']
 	#if product == 'custom':
         #    custom_profile_path = 'custom_profiles/' + mode + '.json'
         #    if file.exists(custom_profile_path):
-        yaml_profiles = loadProfiles('profiles.yaml')
+        yaml_profiles = loadProfiles(os.path.join(dirname, 'profiles.yaml'))
         return jsonify(yaml_profiles[product][mode])
 
-    def post(self, product, mode):
+    def post(self):
+        payload = request.get_json()
+        product = payload['product']
+        mode = payload['mode']
+
         if product == 'custom':
-            custom_profile_path = 'profiles/custom/' + mode + '.json'
+            custom_profile_path = os.path.join(dirname, 'profiles/custom/' + mode + '.json')
             if file.exists(custom_profile_path):
                 with open(custom_profile_path, 'r') as f:
                     saved_profile = json.load(f)
@@ -221,26 +233,32 @@ class SetVars(Resource):
         targets = ['setpoint', 'fanlevel', 'profile', 'kp', 'ki', 'kd', 'hkp', 'hki', 'hkd']
         payload_validated = {key: payload[key] for key in payload.keys() if key in targets}
 
+
+        for key in list(payload_validated):
+            if payload_validated[key] in ['default', '']:
+                del payload_validated[key]
+
         print(payload_validated)
 
         # if profile name is set in user input, use it as the filename in custom_profiles/ directory
         # and update profile name in validated payload to "custom/{profile_name}"
         if 'profile' in payload_validated:
-            custom_profile_path = "profiles/custom/" + payload_validated['profile'] + ".json"
+            custom_profile_path = os.path.join(dirname, "profiles/custom/" + payload_validated['profile'] + ".json")
             payload_validated['profile'] = "custom/%s" % payload_validated['profile']
         # if no profile name is set, file path will be custom_profiles/YYYYMMDD_custom.json
         else:
             date = datetime.now().strftime("%Y%m%d")
-            custom_profile_path = "profiles/custom/" + date + "_custom.json"
-
-        # save custom profile to custom_profiles directory
-        writeProfile(payload_validated, custom_profile_path)
-
-        # write to disk as current profile so it gets applied automatically on restart
-        writeProfile(payload_validated, current_profile_path)
+            custom_profile_path = os.path.join(dirname, "profiles/custom/" + date + "_custom.json")
 
         # update current profile and pass data to Arduino
         FERM_PROFILE.update(payload_validated)
+
+        # save custom profile to custom_profiles directory
+        writeProfile(FERM_PROFILE, custom_profile_path)
+
+        # write to disk as current profile so it gets applied automatically on restart
+        writeProfile(FERM_PROFILE, current_profile_path)
+
         serialSend(FERM_PROFILE)
 
         return FERM_PROFILE, 201
@@ -258,7 +276,7 @@ ser = serial.Serial('/dev/ttyACM0', baudrate=115200, timeout=5)
 
 # load profiles
 print("loading YAML profiles...")
-with open('profiles.yaml', 'r') as file:
+with open(os.path.join(dirname, 'profiles.yaml'), 'r') as file:
     yaml_profiles = yaml.safe_load(file)
 
 # read data from Arduino
@@ -275,7 +293,7 @@ print(FERM_PROFILE)
 
 # check for saved profile and load if it exists
 print("checking for saved profile...")
-current_profile_path = 'profile.json'
+current_profile_path = os.path.join(dirname, 'profile.json')
 
 if exists(current_profile_path):
     print("loading saved profile...")
@@ -292,7 +310,7 @@ parser.add_argument('setpoint', 'fanlevel', 'profile')
 
 api.add_resource(Status, '/status')
 api.add_resource(Variables, '/status/variables')
-api.add_resource(Profile, '/profiles/<product>/<mode>')
+api.add_resource(Profile, '/profile')
 api.add_resource(Profiles, '/profiles')
 api.add_resource(SetVars, '/set')
 # api.add_resource(ClearCache, '/clear')

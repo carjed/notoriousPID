@@ -1,1 +1,1 @@
-{"kp": 0, "ki": 0, "kd": 0, "hkp": 1, "hki": 0, "hkd": 0, "profile": "custom/tune1"}
+{"setpoint": 3.3, "fanlevel": 0.8, "kp": 25, "ki": 0.00015, "kd": 50, "hkp": 0.6, "hki": 0.2, "hkd": 10, "profile": "custom/tune1"}

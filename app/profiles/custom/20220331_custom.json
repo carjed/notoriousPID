@@ -1,0 +1,1 @@
+{"setpoint": 21.6, "fanlevel": 0.8, "probetemp": 22.1875, "chambertemp": 21.5625, "humidity": 74, "cooling": false, "heating": true, "output": 22.90369, "heatoutput": 197938.5, "kp": 10, "ki": 0.001, "kd": 0, "hkp": 0.8, "hki": 9.999999e-06, "hkd": 0, "profile": "bread/bulk"}

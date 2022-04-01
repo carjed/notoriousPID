@@ -1,25 +1,26 @@
 // Notorious PID Fermentation Temperature Control v 0.9
 #include <Arduino.h>
-// #include <aREST.h>
 #include <avr/wdt.h>
 #include <OneWire.h>
 #include <ArduinoJson.h>
 #include <DHT.h>
 #include "PID_v1.h"
 #include "probe.h"
-#include "fridge.h"
+// #include "fridge.h"
 #include "globals.h"
 #include "functions.h"
+#include "Ticks.h"
+#include "TempControl.h"
+#include "temperatureFormats.h"
+#include "pins.h"
 #define DEBUG false  // debug flag for including debugging code
+#define DHTTYPE DHT11
 #define NUMBER_VARIABLES 20
 #define OUTPUT_BUFFER_SIZE 5000
-#define _SS_MAX_TX_BUFF 256 // RX buffer size
-#define SERIAL_TX_BUFFER_SIZE 256
-#define DHTTYPE DHT11
+// #define _SS_MAX_TX_BUFF 256 // RX buffer size
+// #define SERIAL_TX_BUFFER_SIZE 256
 
-DHT dht(dhtpin, DHTTYPE);
-
-// aREST rest = aREST();
+DHT dht(dhtPin, DHTTYPE);
 
 void mainUpdate();  // update sensors, PID output, fridge state, write to log, run profiles
 int setManual(String command);
@@ -28,51 +29,43 @@ int setManual(String command);
 // start conversion for all sensors
 // update sensors when conversion complete
 void mainUpdate() {
-  probe::startConv();
-  if (probe::isReady()) {
-    fridge.update();
-    beer.update();
-    Input = beer.getFilter();
-  }
 
-  mainPID.Compute();
-  updateFridge();  
+  // update temp control
+  tempControl.updateTemperatures();		
+  tempControl.detectPeaks();
+  tempControl.updatePID();
+  tempControl.updateState();
+  tempControl.updateOutputs();
 
-  bt = beer.getTemp();
-  ft = fridge.getTemp();
+  bool cooling_status = !digitalRead(coolingPin);
+  bool heating_status = !digitalRead(heatingPin);
 
+  // update humidity reading
   humidity = dht.readHumidity();
 
-  temp_reached = fabs(Setpoint - bt) <= epsilon;
-
-  relay1_status = !digitalRead(relay1);
-  relay2_status = !digitalRead(relay2);
-
+  // format JSON payload
+  StaticJsonDocument<500> doc2;
   
-  StaticJsonDocument<500> doc;
-  doc["setpoint"] = Setpoint;
-  doc["fanlevel"] = fan_level;
-  doc["probetemp"] = bt;
-  doc["chambertemp"] = ft;
-  doc["humidity"] = humidity;
-  doc["cooling"] = relay1_status;
-  doc["heating"] = relay2_status;
-  doc["output"] = Output;
-  doc["heatoutput"] = heatOutput;
-  doc["kp"] = Kp;
-  doc["ki"] = Ki;
-  doc["kd"] = Kd;
-  doc["hkp"] = heatKp;
-  doc["hki"] = heatKi;
-  doc["hkd"] = heatKd;
-
+  doc2["setpoint"] = tempControl.getBeerSetting();
+  doc2["fanlevel"] = fan_level;
+  doc2["probetemp"] = tempControl.getBeerTemp();
+  doc2["chambertemp"] = tempControl.getFridgeTemp();
+  doc2["humidity"] = humidity;
+  doc2["cooling"] = cooling_status;
+  doc2["heating"] = heating_status;
+  char tempString[12];
+  doc2["output"] = fixedPointToString(tempString, tempControl.cs.coolEstimator, 3, 12);
+  doc2["heatoutput"] = fixedPointToString(tempString, tempControl.cs.heatEstimator, 3, 12);
+  doc2["kp"] = fixedPointToString(tempString, tempControl.cc.Kp, 3, 12);
+  doc2["ki"] = fixedPointToString(tempString, tempControl.cc.Ki, 3, 12);
+  doc2["kd"] = fixedPointToString(tempString, tempControl.cc.Kd, 3, 12);
 
   if( Serial.available()) {
-    serializeJson(doc, Serial);
+    serializeJson(doc2, Serial);
     // Serial.println();
   }
 
-  if(relay1_status == false && relay2_status == false){
+  if(cooling_status == false && heating_status == false){
     setPWM1A(0.0f);
   } else {
     setPWM1A(fan_level);
@@ -80,57 +73,47 @@ void mainUpdate() {
 }
 
 int setManual(String command){
-  // parse string in the format param0=abc&param1=def
-  //for (int i=0; i<8; i++){
+  // parse string in the format /set?param0=abc&param1=def
   String param = getValue(command, '=', 0);
-  String value = getValue(command, '=', 1);
   // strip '/set?' prefix from param value
   param.remove(0,5);
-    //Serial.print(param);
-    //Serial.println();
-    //Serial.print(value);
-    //Serial.println();
+
+  String value = getValue(command, '=', 1);
+  int str_len = value.length() + 1; 
+  char val_chr[str_len];
+  value.toCharArray(val_chr, str_len);
+  
   if (param == "setpoint"){
-    Setpoint = value.toDouble();
+    tempControl.cs.beerSetting = stringToTemp(val_chr);
   }
   else if (param == "fanlevel"){
     fan_level = value.toFloat();
     setPWM1A(fan_level);
   }
   else if (param == "kp"){
-    Kp = value.toDouble();
+    tempControl.cc.Kp = stringToFixedPoint(val_chr);
   }
   else if (param == "ki"){
-    Ki = value.toDouble();
+    tempControl.cc.Ki = stringToFixedPoint(val_chr);
   }
   else if (param == "kd"){
-    Kd = value.toDouble();
-  }
-  else if (param == "hkp"){
-    heatKp = value.toDouble();
-  }
-  else if (param == "hki"){
-    heatKi = value.toDouble();
-  }
-  else if (param == "hkd"){
-    heatKd = value.toDouble();
+    tempControl.cc.Kd = stringToFixedPoint(val_chr);
   }
   
-  mainPID.SetTunings(Kp, Ki, Kd);
-  mainPID.initHistory();
-  heatPID.SetTunings(heatKp, heatKi, heatKd); 
-  heatPID.initHistory();
+  // mainPID.SetTunings(Kp, Ki, Kd);
+  // heatPID.SetTunings(heatKp, heatKi, heatKd); 
+
   return 1;
 }
 
 void setup() {
   // set up fans
   //enable outputs for Timer 1
-  pinMode(fan1a, OUTPUT);
-  pinMode(fan1b, OUTPUT);
+  pinMode(fan1aPin, OUTPUT);
+  pinMode(fan1bPin, OUTPUT);
   setupTimer1();
   //enable outputs for Timer 2
-  pinMode(fan2, OUTPUT); //2
+  pinMode(fan2Pin, OUTPUT); //2
   setupTimer2();
   //note that pin 11 will be unavailable for output in this mode!
   setPWM1A(fan_level); //set duty to 50% on pin 9
@@ -138,58 +121,40 @@ void setup() {
   // digitalWrite(fan1b, LOW);
 
   // configure relay pins and write default HIGH (relay open)
-  pinMode(relay1, OUTPUT);
-    digitalWrite(relay1, HIGH);
-  pinMode(relay2, OUTPUT);
-    digitalWrite(relay2, HIGH);
+  pinMode(coolingPin, OUTPUT);
+    digitalWrite(coolingPin, HIGH);
+  pinMode(heatingPin, OUTPUT);
+    digitalWrite(heatingPin, HIGH);
+
+	tempControl.loadSettingsAndConstants(); //read previous settings from EEPROM
+	tempControl.init();
+	tempControl.updatePID();
+	tempControl.updateState();
 
   dht.begin();  
 
   //Serial.begin(9600);
   Serial.begin(115200);
 
-  // initialize PID controller
-  fridge.init();
-  beer.init();
-  
-  mainPID.SetTunings(Kp, Ki, Kd);    // set tuning params
-  mainPID.SetSampleTime(1000);       // (ms) matches sample rate (1 hz)
-  mainPID.SetOutputLimits(0.3, 50);  // deg C (~32.5 - ~100 deg F)
-  mainPID.SetMode(AUTOMATIC);
-  mainPID.setOutputType(FILTERED);
-  mainPID.setFilterConstant(10);
-  mainPID.initHistory();
-
-  heatPID.SetTunings(heatKp, heatKi, heatKd);
-  heatPID.SetSampleTime(heatWindow);       // sampletime = time proportioning window length
-  heatPID.SetOutputLimits(0, heatWindow);  // heatPID output = duty time per window
-  heatPID.SetMode(AUTOMATIC);
-  heatPID.initHistory();
-
-  bt = beer.getTemp();
-  ft = fridge.getTemp();
-
   humidity = dht.readHumidity();
   // relays use 0 for on, 1 for off, so we invert for the api exposure
-  relay1_status = !digitalRead(relay1);
-  relay2_status = !digitalRead(relay2);
+  bool cooling_status = !digitalRead(coolingPin);
+  bool heating_status = !digitalRead(heatingPin);
 
   StaticJsonDocument<500> doc2;
-  doc2["setpoint"] = Setpoint;
+  doc2["setpoint"] = tempControl.getBeerSetting();
   doc2["fanlevel"] = fan_level;
-  doc2["probetemp"] = bt;
-  doc2["chambertemp"] = ft;
+  doc2["probetemp"] = tempControl.getBeerTemp();
+  doc2["chambertemp"] = tempControl.getFridgeTemp();
   doc2["humidity"] = humidity;
-  doc2["cooling"] = relay1_status;
-  doc2["heating"] = relay2_status;
-  doc2["output"] = Output;
-  doc2["heatoutput"] = heatOutput;
-  doc2["kp"] = Kp;
-  doc2["ki"] = Ki;
-  doc2["kd"] = Kd;
-  doc2["hkp"] = heatKp;
-  doc2["hki"] = heatKi;
-  doc2["hkd"] = heatKd;
+  doc2["cooling"] = cooling_status;
+  doc2["heating"] = heating_status;
+  char tempString[12];
+  doc2["output"] = fixedPointToString(tempString, tempControl.cs.coolEstimator, 3, 12);
+  doc2["heatoutput"] = fixedPointToString(tempString, tempControl.cs.heatEstimator, 3, 12);
+  doc2["kp"] = fixedPointToString(tempString, tempControl.cc.Kp, 3, 12);
+  doc2["ki"] = fixedPointToString(tempString, tempControl.cc.Ki, 3, 12);
+  doc2["kd"] = fixedPointToString(tempString, tempControl.cc.Kd, 3, 12);
   
   if ( Serial.available()) {
     serializeJson(doc2, Serial);
@@ -205,10 +170,6 @@ void loop() {
 
   // subroutines manage their own timings, call every loop
   mainUpdate();
-    
-  // unsigned long currentTime = millis();
-  // const unsigned long updateInterval = 1000;
-  // static unsigned long updateTimer = 0;
 
   // check for serial input and update settings
   if(Serial.available()){
@@ -219,26 +180,4 @@ void loop() {
       setManual(userInput);
     }
   } 
-
-  // if (currentTime - updateTimer <= updateInterval){
-  //   // if(Setpoint != oldSetpoint){
-  //   updateTimer += updateInterval;
-  //   mainUpdate();
-  //   Serial.print("Setpoint: ");
-  //   Serial.print(Setpoint, 1);
-  //   Serial.println("°C");
-  //   Serial.print("Beer Temp:");
-  //   Serial.print(beer.getTemp(), 1);
-  //   Serial.println("°C");
-  //   Serial.print("Fridge Temp:");
-  //   Serial.print(fridge.getTemp(), 1);
-  //   Serial.println("°C");
-  //   Serial.print("Output Temp:");
-  //   Serial.print(Output, 1);
-  //   Serial.println("°C");
-  //   Serial.print("Heat Output Temp:");
-  //   Serial.print(heatOutput, 1);
-  //   Serial.println("°C");
-  //   // }
-  // }
 }
